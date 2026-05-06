@@ -1,6 +1,6 @@
 # Contributing to AS Code
-
-First off, thank you for considering contributing to AS Code. It's people like you that make AS Code such a great tool.
+ 
+ First off, thank you for considering contributing to AS Code. Our mission is to make fast, lightweight local AI accessible to everyone on real-world hardware, and your help is vital to achieving that goal.
 
 ## Where do I go from here?
 

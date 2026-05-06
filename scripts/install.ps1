@@ -1,14 +1,14 @@
 <#
 .SYNOPSIS
-    AS Code Installation Script
+    AS Code Setup Script
 .DESCRIPTION
-    Sets up the AS Code environment on Windows.
+    Fast, lightweight, general-purpose local AI runtime setup for Windows.
 #>
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "       AS Code - Setup Script            " -ForegroundColor Cyan
+Write-Host "       AS Code - Local AI Setup          " -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
 # 1. Verify Python

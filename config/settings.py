@@ -27,25 +27,35 @@ class Settings(BaseSettings):
     models_dir: str = Field(
         default="models", description="Directory for model files"
     )
+
     reasoning_model_id: str = Field(
-        default="deepseek-r1-1.5b", description="Reasoning model identifier"
-    )
-    reasoning_model_file: str = Field(
         default="deepseek-r1-1.5b",
+        description="Reasoning model identifier"
+    )
+
+    reasoning_model_file: str = Field(
+        default="models/deepseek/deepseek_q8_ekv1280.task",
         description="Reasoning model filename",
     )
+
     reasoning_model_vram_mb: int = Field(
-        default=1200, description="Estimated VRAM for reasoning model (MB)"
+        default=1200,
+        description="Estimated VRAM for reasoning model (MB)"
     )
+
     coding_model_id: str = Field(
-        default="gemma-4-e2b", description="Coding model identifier"
-    )
-    coding_model_file: str = Field(
         default="gemma-4-e2b",
+        description="Coding model identifier"
+    )
+
+    coding_model_file: str = Field(
+        default="models/gemma/gemma-3n-E2B-it-int4.litertlm",
         description="Coding model filename",
     )
+
     coding_model_vram_mb: int = Field(
-        default=1500, description="Estimated VRAM for coding model (MB)"
+        default=1500,
+        description="Estimated VRAM for coding model (MB)"
     )
 
     # ── Provider ───────────────────────────────────────────────

@@ -6,7 +6,7 @@
 app:
   name: "AS Code"
   version: "0.1.0"
-  description: "Ultra-optimized local AI inference for edge hardware"
+  description: "Fast, lightweight, general-purpose local AI runtime for real hardware"
 
 # Server configuration
 server:

@@ -2,13 +2,14 @@
 .SYNOPSIS
     AS Code Run Script
 .DESCRIPTION
-    Starts the AS Code FastAPI server.
+    Starts the AS Code Local AI Server.
 #>
 
 $ErrorActionPreference = "Stop"
 
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "         Starting AS Code Server         " -ForegroundColor Cyan
+Write-Host "      Fast Local AI for Real Hardware    " -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
 if (-not (Test-Path "venv\Scripts\Activate.ps1")) {
@@ -19,6 +20,11 @@ if (-not (Test-Path "venv\Scripts\Activate.ps1")) {
 # Activate venv
 Write-Host "Activating virtual environment..."
 .\venv\Scripts\Activate.ps1
+
+# Force UTF-8 console encoding for LiteRT + DeepSeek
+chcp 65001 > $null
+$env:PYTHONIOENCODING = "utf-8"
+$env:PYTHONUTF8 = "1"
 
 # Optional: Open browser logic (can be expanded later if a specific port/URL is known)
 # Write-Host "Opening local UI in browser..."

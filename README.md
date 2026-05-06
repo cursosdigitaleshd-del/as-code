@@ -2,9 +2,9 @@
 
 **By Alpha Software**
 
-AS Code is a local AI inference runtime designed for performance and stability on Windows. It provides a robust backend to run LLM models locally with full GPU acceleration, an OpenAI-compatible API, and SSE streaming.
+AS Code is a lightweight, general-purpose local AI runtime designed for speed and simplicity on modest hardware. It provides a robust, Windows-optimized environment to run large language models locally with minimal overhead, a browser-first chat experience, and an OpenAI-compatible API.
 
-> **Note:** This is an early open-source release focused on providing a stable runtime environment on Windows.
+> **AS Code is NOT just for coding.** It is a personal AI platform for ideas, productivity, planning, writing, and local experimentation.
 
 ## Current Status
 
@@ -25,17 +25,21 @@ Current focus:
 
 Advanced optimization and autonomous systems are planned for future phases.
 
-## 🚀 Current Capabilities
+## 🚀 Key Features
 
-* **LiteRT-LM Inference:** Running reliably on Windows.
-* **GPU Acceleration:** Full support for local hardware acceleration.
-* **FastAPI Backend:** High-performance serving framework.
-* **OpenAI-Compatible API:** Drop-in replacement for OpenAI endpoints.
-* **SSE Streaming:** Real-time token streaming support.
-* **Local Web UI:** Minimal, functional browser-based UI included.
-* **Hardware-Adaptive Runtime:** Automatically adjusts to your system.
-* **Smart Routing & VRAM-Aware Loading:** Intelligent model management.
-* **Hot Swap:** Base implemented for fast model switching.
+*   **LiteRT-LM Runtime:** Ultra-optimized inference engine for Windows.
+*   **Hardware-Adaptive:** Automatically adjusts to your system's VRAM and CPU capabilities.
+*   **Browser-First Experience:** A premium, minimal local web UI for everyday use.
+*   **OpenAI-Compatible API:** Use AS Code as a drop-in backend for any tool that supports OpenAI.
+*   **Low VRAM Optimization:** Intelligent model loading and hot-swapping.
+*   **Optional Extensions:** Seamlessly integrates with VSCode/Cline when you need a coding companion.
+
+## 📸 Experience AS Code
+
+*(Screenshots coming soon)*
+- **Personal Assistant:** Drafting emails and planning workflows.
+- **Creative Hub:** Writing stories and brainstorming ideas.
+- **Local Server:** Powering third-party AI tools via the API.
 
 ## 📸 Screenshots
 
@@ -44,10 +48,12 @@ Advanced optimization and autonomous systems are planned for future phases.
 - `[Screenshot of Terminal Output]`
 - `[Screenshot of VSCode Integration]`
 
-## 💻 Hardware Target
+## 💻 Hardware Philosophy
 
-- **OS:** Windows 10/11
-- **GPU:** Dedicated GPU highly recommended for optimal performance
+AS Code is built for "Real Hardware"—the laptops and desktops people actually own. While a dedicated GPU is recommended for the best experience, our architecture is designed to remain responsive even on mid-range systems.
+
+- **Optimized for:** Windows 10/11
+- **Focus:** Maximum performance per watt/GB.
 
 ## 🏗 Architecture Summary
 
@@ -104,8 +110,6 @@ Once running, the API is available at `http://localhost:8000`.
 AS Code exposes an OpenAI-compatible API, making it fully compatible with VSCode extensions like Cline. Simply configure your extension to use an OpenAI-compatible provider with the base URL pointing to `http://localhost:8000/v1` and any dummy API key.
 
 ## 🗺 Roadmap Overview
-
-We are building incrementally. See [ROADMAP.md](ROADMAP.md) for full details.
 
 - **Completed Phases:** Core architecture, LiteRT Windows runtime, GPU support, OpenAI API, minimal UI.
 - **Upcoming Phases:** Hardening, logging, error handling, queueing.

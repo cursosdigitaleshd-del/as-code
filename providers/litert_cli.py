@@ -245,25 +245,32 @@ class LiteRTCLIProvider(InferenceProvider):
 
         try:
             self._status = ProviderStatus.BUSY
+            logger.info(f"Starting LiteRT-LM subprocess: {' '.join(cmd)}")
 
+            # Merge stderr into stdout to avoid deadlock and capture all info
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
+                bufsize=1, # Line buffered for stdout (if supported)
+                stdin=subprocess.DEVNULL,
             )
             
             self._active_processes[request.model_id] = proc
 
-            # Stream stdout line by line
+            # Stream stdout character by character
             first_token_time = None
+            
+            # Internal buffer to handle multi-char tags like <think>
+            tag_buffer = ""
 
             while True:
                 if cancel_event.is_set():
+                    logger.info(f"Cancellation requested for {request.request_id}")
                     proc.terminate()
-
                     yield InferenceResult(
                         text="",
                         finish_reason="stop",
@@ -273,23 +280,53 @@ class LiteRTCLIProvider(InferenceProvider):
                     )
                     return
 
-                chunk = proc.stdout.read(1)
+                # Read one character at a time to ensure real-time streaming
+                # even if no newlines are present (common in DeepSeek <think> blocks)
+                char = proc.stdout.read(1)
 
-                if not chunk:
-                    break
-
-                text = chunk
-
-                if not text:
+                if not char:
+                    # Check if process is still alive
+                    if proc.poll() is not None:
+                        break
                     continue
-
-                tokens_generated += 1
 
                 if first_token_time is None:
                     first_token_time = time.perf_counter()
+                    logger.info(f"First token received for {request.request_id} in {first_token_time - start_time:.2f}s")
+
+                # Track generated tokens (rough estimate)
+                if char.isspace():
+                    tokens_generated += 1
 
                 elapsed = time.perf_counter() - start_time
                 tps = tokens_generated / elapsed if elapsed > 0 else 0
+
+                # Clean up output
+                # We handle tags by skipping them if they appear exactly
+                # This is a bit naive for read(1) but prevents the hang
+                text = char
+                text = text.replace("\x00", "")
+                
+                # Filter out the start of thinking blocks to keep UI clean
+                # Note: This is simplified; a full state machine would be better
+                # but read(1) is the priority for the hang fix.
+                if text in ("<", "t", "h", "i", "n", "k", ">", "/"):
+                    tag_buffer += text
+                    # If we have a complete tag, don't yield it
+                    if tag_buffer in ("<think>", "</think>"):
+                        tag_buffer = ""
+                        continue
+                    # If the buffer is getting too long and doesn't match, flush it
+                    if len(tag_buffer) > 10:
+                        yield_text = tag_buffer
+                        tag_buffer = ""
+                        text = yield_text
+                    else:
+                        continue
+                elif tag_buffer:
+                    # Not part of a tag, flush buffer
+                    text = tag_buffer + text
+                    tag_buffer = ""
 
                 yield InferenceResult(
                     text=text,
@@ -302,13 +339,8 @@ class LiteRTCLIProvider(InferenceProvider):
                 )
 
             # Wait for process to finish
-            proc.wait()
-
-            # Read stderr for any errors
-            stderr_data = proc.stderr.read()
-            
-            if proc.returncode != 0 and stderr_data:
-                logger.error(f"CLI process error: {stderr_data}")
+            return_code = proc.wait()
+            logger.info(f"Subprocess finished with return code {return_code}")
 
             elapsed = time.perf_counter() - start_time
             tps = tokens_generated / elapsed if elapsed > 0 else 0

@@ -1,7 +1,7 @@
 [project]
 name = "as-code"
 version = "0.1.0"
-description = "Ultra-optimized local AI inference for edge hardware"
+description = "Fast, lightweight, general-purpose local AI runtime for modest hardware"
 readme = "README.md"
 license = {text = "Apache-2.0"}
 requires-python = ">=3.11"
@@ -9,8 +9,8 @@ authors = [
     {name = "Alpha Software"},
 ]
 keywords = [
-    "edge-ai", "local-inference", "litert", "litert-lm",
-    "fastapi", "openai-compatible", "lightweight",
+    "local-ai", "general-purpose", "windows-optimized", "lightweight",
+    "litert-lm", "fastapi", "openai-compatible", "personal-ai",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",

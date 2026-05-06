@@ -54,7 +54,7 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown lifecycle."""
     settings = get_settings()
     logger.info("=" * 60)
-    logger.info("  AS Code — Local Edge AI Runtime")
+    logger.info("  AS Code — Fast Local AI Runtime")
     logger.info("  by Alpha Software")
     logger.info("=" * 60)
 
@@ -138,7 +138,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="AS Code",
-    description="Ultra-optimized local AI inference for edge hardware",
+    description="Fast, lightweight, general-purpose local AI runtime for modest hardware",
     version="0.1.0",
     lifespan=lifespan,
     docs_url="/docs",
