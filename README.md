@@ -34,16 +34,18 @@ Advanced optimization and autonomous systems are planned for future phases.
 *   **Low VRAM Optimization:** Intelligent model loading and hot-swapping.
 *   **Optional Extensions:** Seamlessly integrates with VSCode/Cline when you need a coding companion.
 
-## 📸 Experience AS Code
-
-*(Screenshots coming soon)*
-- **Personal Assistant:** Drafting emails and planning workflows.
-- **Creative Hub:** Writing stories and brainstorming ideas.
-- **Local Server:** Powering third-party AI tools via the API.
-
 ## 📸 Screenshots
 
+### Local AI Chat
+
 ![AS Code UI](screenshots/ui-chat.png)
+
+### Features shown
+- Multi-model routing
+- GPU acceleration
+- Local inference
+- Real-time streaming
+- Browser-based UI
 
 ## 💻 Hardware Philosophy
 
