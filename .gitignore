@@ -66,3 +66,6 @@ desktop.ini
 # DirectX Shader Compiler
 dxil.dll
 dxcompiler.dll
+
+# Local developer notes (not for public repo)
+dev-notes/

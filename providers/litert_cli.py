@@ -400,7 +400,13 @@ class LiteRTCLIProvider(InferenceProvider):
     def _build_command(
         self, model_ref: str, request: InferenceRequest
     ) -> list[str]:
-        """Build the CLI command for inference."""
+        """Build the CLI command for inference.
+
+        IMPORTANT: every argument and its value MUST be a separate list item.
+        Using f"--flag={value}" causes the value to be parsed as part of the
+        flag string by some CLI parsers, which can corrupt the prompt when it
+        contains whitespace, newlines, or sequences that look like flags (--).
+        """
         # Construct the full prompt with system prompt if present
         prompt = request.prompt
         if request.system_prompt:
@@ -410,16 +416,19 @@ class LiteRTCLIProvider(InferenceProvider):
             self._cli_path,
             "run",
             model_ref,
-            f"--backend={self._default_backend}",
-            f"--prompt={prompt}",
-            f"--max-num-tokens={request.max_tokens}",
-            f"--temperature={request.temperature}",
-            f"--top-k={request.top_k}",
+            "--backend", self._default_backend,
+            "--prompt", prompt,
+            "--max-num-tokens", str(request.max_tokens),
+            "--temperature", str(request.temperature),
+            "--top-k", str(request.top_k),
         ]
 
-        enable_speculative = False
+        # Speculative decoding — disabled for now, Gemma 3n requires 'auto'
+        # cmd.extend(["--enable-speculative-decoding", "auto"])
 
-        if enable_speculative:
-            cmd.append("--enable-speculative-decoding=true")
+        logger.debug(f"CLI command: {self._cli_path} run {model_ref} [prompt omitted] "
+                     f"--max-num-tokens {request.max_tokens} "
+                     f"--temperature {request.temperature} "
+                     f"--top-k {request.top_k}")
 
         return cmd

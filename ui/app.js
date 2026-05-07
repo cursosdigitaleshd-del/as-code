@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let fullText = '';
         const startTime = performance.now();
         let tokenCount = 0;
+        let wasUserAborted = false;  // true ONLY when user clicked Stop or pressed Escape
 
         const requestBody = {
             model: elements.modelSelect.value,
@@ -220,7 +221,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             if (e.name === 'AbortError') {
-                console.log('Generation aborted by user');
+                wasUserAborted = true;  // User explicitly stopped — mark for cancel call
+                console.log('Generation stopped by user');
             } else {
                 console.error('Generation error:', e);
                 fullText += `\n\n**[Error: ${e.message}]**`;
@@ -244,13 +246,15 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.stopBtn.classList.add('hidden');
             elements.statusIndicator.className = 'status-dot status-ready';
             
-            // Trigger background cancel to engine just in case it's still running
-            if (state.currentRequestId) {
+            // ONLY call /v1/cancel when the user explicitly aborted.
+            // Do NOT cancel after successful completion — the stream already ended cleanly.
+            if (wasUserAborted && state.currentRequestId) {
                 fetch(`/v1/cancel?request_id=${state.currentRequestId}`, { method: 'POST' }).catch(() => {});
-                state.currentRequestId = null;
             }
+            state.currentRequestId = null;
         }
     }
+
 
     async function stopGeneration() {
         if (!state.isGenerating) return;
