@@ -12,6 +12,7 @@ AS Code is evolving into a fast, lightweight, general-purpose local AI runtime. 
 * Smart Routing Base
 * Premium Minimal Web UI
 * Model Hot-Swap Support
+* **Multi-Role Support:** Dedicated roles for Chat, Code, and Reasoning with Gemma.
 
 ## 🚧 Current Priorities
 

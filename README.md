@@ -78,21 +78,23 @@ cd as-code
 
 ## 🧠 Manual Model Setup (Important)
 
-> **Important Limitation:** Models are **NOT automatically downloaded** due to HuggingFace authentication requirements. Automatic model management is planned for a future release.
+AS Code uses a **Role-Based Architecture**. The internal logic doesn't care about specific model names, only about the role the model plays.
 
-AS Code uses a dual-model architecture with two GPU-accelerated Gemma LiteRT models:
+| Role           | Purpose                                      | Model File (LiteRT-LM) |
+|----------------|----------------------------------------------|------------------------|
+| **Chat**       | General conversation and planning            | `gemma-3n-E2B-it-int4.litertlm` |
+| **Code**       | Technical tasks and programming              | `gemma-3n-E2B-it-int4.litertlm` |
+| **Reasoning**  | Deep analysis and complex architecture       | `gemma-3n-E2B-it-int4.litertlm` |
 
-| Role           | Model ID        | File path                                          |
-|----------------|-----------------|----------------------------------------------------|
-| General / Chat | `gemma-3n-web`  | `models/gemma/gemma-3n-E2B-it-int4-Web.litertlm`  |
-| Coding         | `gemma-3n-code` | `models/gemma/gemma-3n-E2B-it-int4.litertlm`      |
+> [!IMPORTANT]
+> The current engine is ultra-optimized for the **`.litertlm`** (LiteRT-LM) format. You can swap models in `config.yaml`, but ensure they follow this specific encoding for maximum performance on Windows hardware.
 
 **Setup steps:**
 
 1. Create the directory: `models\gemma\`
-2. Download both `.litertlm` files from [HuggingFace — litert-community](https://huggingface.co/litert-community).
-3. Place them in the paths shown above.
-4. Run the server — the runtime detects and registers them automatically.
+2. Download the `.litertlm` file from [HuggingFace — litert-community](https://huggingface.co/litert-community/gemma-3n-E2B-it-litert-lm).
+3. Place it in the directory.
+4. Run the server — the runtime detects and registers the roles automatically.
 
 
 ## 🏃‍♂️ Running the Project
