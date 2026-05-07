@@ -29,7 +29,7 @@ INFERENCE_PROFILES: dict[str, InferenceProfile] = {
     "gemma-3n-web": InferenceProfile(
         model_id="gemma-3n-web",
         temperature=0.7,
-        max_tokens=1024,
+        max_tokens=5120,
         top_k=40,
         top_p=0.95,
         context_length=2048,
@@ -46,7 +46,7 @@ INFERENCE_PROFILES: dict[str, InferenceProfile] = {
     "gemma-3n-code": InferenceProfile(
         model_id="gemma-3n-code",
         temperature=0.7,
-        max_tokens=1024,
+        max_tokens=5120,
         top_k=40,
         top_p=0.95,
         context_length=2048,
@@ -71,7 +71,7 @@ def get_inference_profile(model_id: str) -> InferenceProfile:
     return InferenceProfile(
         model_id=model_id,
         temperature=0.7,
-        max_tokens=1024,
+        max_tokens=5120,
         top_k=40,
         top_p=0.95,
         context_length=2048,

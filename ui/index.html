@@ -1,15 +1,19 @@
 <!DOCTYPE html>
 <html lang="en" class="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AS Code — Fast Local AI</title>
-    <meta name="description" content="Fast, lightweight, general-purpose local AI runtime for real hardware. By Alpha Software.">
+    <meta name="description"
+        content="Fast, lightweight, general-purpose local AI runtime for real hardware. By Alpha Software.">
 
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
 
     <!-- Tailwind CDN (lightweight play CDN) -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,6 +57,7 @@
 
     <link rel="stylesheet" href="/static/style.css">
 </head>
+
 <body class="bg-surface-950 text-surface-100 font-sans antialiased min-h-screen flex flex-col">
 
     <!-- ── Top Bar ──────────────────────────────────────────── -->
@@ -61,12 +66,12 @@
             <!-- Logo -->
             <div class="logo-mark">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" 
-                          stroke="url(#logo-grad)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#logo-grad)"
+                        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                     <defs>
                         <linearGradient id="logo-grad" x1="2" y1="2" x2="22" y2="22">
-                            <stop stop-color="#6ea8fe"/>
-                            <stop offset="1" stop-color="#a78bfa"/>
+                            <stop stop-color="#6ea8fe" />
+                            <stop offset="1" stop-color="#a78bfa" />
                         </linearGradient>
                     </defs>
                 </svg>
@@ -82,15 +87,16 @@
             <!-- Telemetry (optional, toggleable) -->
             <button id="toggleTelemetry" class="icon-btn" title="Toggle telemetry">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M18 20V10M12 20V4M6 20v-6"/>
+                    <path d="M18 20V10M12 20V4M6 20v-6" />
                 </svg>
             </button>
 
             <!-- Settings toggle -->
             <button id="toggleSettings" class="icon-btn" title="Settings">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z"/>
-                    <circle cx="12" cy="12" r="3"/>
+                    <path
+                        d="M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z" />
+                    <circle cx="12" cy="12" r="3" />
                 </svg>
             </button>
         </div>
@@ -139,7 +145,8 @@
                     Temperature
                     <span id="tempValue" class="text-accent-400 ml-1">0.7</span>
                 </label>
-                <input type="range" id="temperatureSlider" min="0" max="2" step="0.1" value="0.7" class="setting-slider">
+                <input type="range" id="temperatureSlider" min="0" max="2" step="0.1" value="0.7"
+                    class="setting-slider">
             </div>
 
             <!-- Max Tokens -->
@@ -147,7 +154,8 @@
                 <label class="setting-label" for="maxTokensInput">
                     Max Tokens
                 </label>
-                <input type="number" id="maxTokensInput" value="1024" min="64" max="8192" step="64" class="setting-input">
+                <input type="number" id="maxTokensInput" value="5120" min="64" max="8192" step="64"
+                    class="setting-input">
             </div>
         </div>
     </div>
@@ -158,12 +166,12 @@
         <div id="welcomeScreen" class="welcome-screen">
             <div class="welcome-logo">
                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" 
-                          stroke="url(#welcome-grad)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="url(#welcome-grad)"
+                        stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
                     <defs>
                         <linearGradient id="welcome-grad" x1="2" y1="2" x2="22" y2="22">
-                            <stop stop-color="#6ea8fe"/>
-                            <stop offset="1" stop-color="#a78bfa"/>
+                            <stop stop-color="#6ea8fe" />
+                            <stop offset="1" stop-color="#a78bfa" />
                         </linearGradient>
                     </defs>
                 </svg>
@@ -172,19 +180,38 @@
             <p class="welcome-subtitle">Fast Local AI Runtime</p>
             <div class="welcome-chips">
                 <button class="welcome-chip" data-prompt="Draft a professional email for a client project proposal">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                        <polyline points="22,6 12,13 2,6" />
+                    </svg>
                     Draft an email
                 </button>
                 <button class="welcome-chip" data-prompt="Plan a 3-day itinerary for a relaxing trip to Tokyo">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                    </svg>
                     Travel planning
                 </button>
-                <button class="welcome-chip" data-prompt="Write a short, engaging story about a forgotten library in a floating city">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <button class="welcome-chip"
+                    data-prompt="Write a short, engaging story about a forgotten library in a floating city">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                    </svg>
                     Creative writing
                 </button>
-                <button class="welcome-chip" data-prompt="Explain the core principles of quantum computing in simple terms">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <button class="welcome-chip"
+                    data-prompt="Explain the core principles of quantum computing in simple terms">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                        <line x1="12" y1="17" x2="12.01" y2="17" />
+                    </svg>
                     Explain a concept
                 </button>
             </div>
@@ -198,34 +225,31 @@
     <footer id="inputArea" class="input-area">
         <div class="input-wrapper">
             <div class="input-container">
-                <textarea
-                    id="messageInput"
-                    class="message-input"
-                    placeholder="Send a message..."
-                    rows="1"
-                    autofocus
-                ></textarea>
+                <textarea id="messageInput" class="message-input" placeholder="Send a message..." rows="1"
+                    autofocus></textarea>
                 <div class="input-actions">
                     <!-- Clear Chat -->
                     <button id="clearBtn" class="icon-btn-sm" title="Clear chat (Ctrl+Shift+K)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5">
+                            <path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" />
                         </svg>
                     </button>
 
                     <!-- Stop Generation -->
                     <button id="stopBtn" class="stop-btn hidden" title="Stop generation (Esc)">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                            <rect x="6" y="6" width="12" height="12" rx="2"/>
+                            <rect x="6" y="6" width="12" height="12" rx="2" />
                         </svg>
                         Stop
                     </button>
 
                     <!-- Send -->
                     <button id="sendBtn" class="send-btn" title="Send message (Enter)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="22" y1="2" x2="11" y2="13"/>
-                            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <line x1="22" y1="2" x2="11" y2="13" />
+                            <polygon points="22 2 15 22 11 13 2 9 22 2" />
                         </svg>
                     </button>
                 </div>
@@ -241,4 +265,5 @@
 
     <script src="/static/app.js"></script>
 </body>
+
 </html>

@@ -43,10 +43,7 @@ Advanced optimization and autonomous systems are planned for future phases.
 
 ## 📸 Screenshots
 
-*(Placeholders for screenshots)*
-- `[Screenshot of Local Web UI]`
-- `[Screenshot of Terminal Output]`
-- `[Screenshot of VSCode Integration]`
+![AS Code UI](screenshots/ui-chat.png)
 
 ## 💻 Hardware Philosophy
 
