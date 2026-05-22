@@ -123,6 +123,11 @@ async def chat_completions(
     # ── Runtime Contract (Subfase 1A / Continuity) ──────────────
     import time
     from runtime.coordinator.models import RuntimeContract
+    from runtime.coordinator.state_store import LightweightStateStore
+    
+    state_store = LightweightStateStore(db)
+    snapshot = state_store.load_session_state(session_id)
+    snapshot.turn_number += 1
     
     # Resolve previous user message from multi-turn history
     previous_user_message = None
@@ -139,9 +144,12 @@ async def chat_completions(
         user_message=user_message,
         previous_user_message=previous_user_message,
         manual_skill=skill_id,
-        timestamp=time.time()
+        timestamp=time.time(),
+        snapshot=snapshot,
+        language_confidence_threshold=2,
+        explicit_reset=user_message.lower().startswith('/reset')
     )
-    logger.info(f"[HARDENING-CONTRACT] Created RuntimeContract: id={contract.request_id} session={contract.session_id} has_prev={previous_user_message is not None}")
+    logger.info(f"[HARDENING-CONTRACT] Created RuntimeContract: id={contract.request_id} session={contract.session_id} has_prev={previous_user_message is not None} turn={snapshot.turn_number}")
 
     # ── Pure Context Assembly (Subfase 1C/1D) ──────────────────────
     try:

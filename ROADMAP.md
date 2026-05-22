@@ -50,7 +50,7 @@ Developing the coordinator, deterministic state machines, task auto-progression,
     *   **ContextManifest**: Serializable intermediate snapshot of prompts, budgets, and RAG details.
     *   **PureCoordinator**: Stateless prompt assembly engine ensuring zero database writes during the prompt compilation phase.
     *   **RuntimeStateMutator**: Post-inference atomic database mutator separating context rendering from side effects.
-    *   **Conversational Continuity (Continuity Fix)**: Deterministic, language-independent `StructuralContinuityResolver` resolving follow-up queries by merging context based on word-count and technical symbol density.
+    *   **Conversational Continuity (Continuity Fix)**: Pure deterministic `DeterministicContinuityResolver` and `DeterministicLanguageDetector` with `LightweightStateStore`. Resolves follow-up queries using entropy-based non-positional carryover, sticky language detection (preventing language oscillation), and explicit/implicit self-sufficiency triggers.
 
 ---
 

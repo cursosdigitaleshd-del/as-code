@@ -33,6 +33,19 @@ class RuntimeStateMutator:
             mem_mgr = WorkingMemoryManager()
             mem_mgr.set_variable(db, session_id, "wf_suggestions", ",".join(manifest.suggested_skills))
             
+            # 5. Save continuity decision if present
+            if manifest.continuity_decision:
+                from runtime.coordinator.state_store import LightweightStateStore
+                state_store = LightweightStateStore(db)
+                state_store.persist_decision(
+                    session_id=session_id,
+                    turn_number=contract.snapshot.turn_number if contract.snapshot else 1,
+                    final_rag_query=manifest.continuity_decision.final_rag_query,
+                    language=manifest.continuity_decision.detected_language,
+                    decision=manifest.continuity_decision,
+                    request_id=contract.request_id
+                )
+            
             db.commit()
             logger.info(f"[MUTATOR] Successfully completed post-inference state mutations for session={session_id}")
         except Exception as e:

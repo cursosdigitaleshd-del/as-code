@@ -6,6 +6,7 @@ from runtime.coordinator.models import WorkflowState, CoordinatorDecision, Runti
 from runtime.coordinator.intent import analyze_intent
 from runtime.coordinator.workflow import load_workflow_state, update_workflow, process_task_progression, predict_next_workflow_state
 from runtime.coordinator.suggestions import get_suggested_skills
+from runtime.coordinator.continuity_resolver import DeterministicContinuityResolver
 
 logger = logging.getLogger("as-code.runtime.coordinator")
 
@@ -133,42 +134,6 @@ class RuntimeCoordinator:
             lines.append(f"Active skill: {active_skill}")
         
         return "\n".join(lines).strip()
-class StructuralContinuityResolver:
-    @staticmethod
-    def resolve_query(user_msg: str, prev_msg: Optional[str]) -> str:
-        """
-        Deterministically resolves context dependency by evaluating length
-        and presence of technical/symbolic references.
-        """
-        if not prev_msg:
-            return user_msg
-
-        clean = user_msg.strip()
-        words = clean.split()
-        
-        # Rule 1: Self-sufficient if word count is 6 or more
-        has_enough_words = len(words) >= 6
-        
-        # Rule 2: Self-sufficient if it contains symbols/syntax representing a technical reference
-        symbols = {".", "/", "\\", "_", "-", "(", ")", "`"}
-        has_symbols = any(sym in clean for sym in symbols)
-        
-        # Also check for CamelCase or snake_case
-        has_cased_identifiers = any(
-            (word.isidentifier() and ("_" in word or (not word.islower() and not word.isupper() and any(c.islower() for c in word) and any(c.isupper() for c in word))))
-            for word in words
-        )
-        
-        is_self_sufficient = has_enough_words or has_symbols or has_cased_identifiers
-        
-        if not is_self_sufficient:
-            # Concatenate context deterministically
-            enriched = f"{prev_msg.strip()} {clean}"
-            logger.info(f"[CONTINUITY-FUSION] Resolved dependent query: {clean!r} -> {enriched!r}")
-            return enriched
-            
-        return user_msg
-
 
 class PureCoordinator:
     def __init__(self):
@@ -200,11 +165,11 @@ class PureCoordinator:
         # 4. Get suggestions
         suggested = get_suggested_skills(db, contract.session_id, contract.user_message, predicted_wf)
 
-        # 5. Language Detection
-        spanish_indicators = {"el", "la", "los", "las", "es", "que", "en", "un", "una", "del", "al", "como", "con", "por", "para", "mi", "mis", "de", "no", "cual"}
-        msg_words = set(contract.user_message.lower().split())
-        is_spanish = len(msg_words & spanish_indicators) >= 2 or any(c in contract.user_message for c in ["¿", "á", "é", "í", "ó", "ú", "ñ"])
-        lang = "ES" if is_spanish else "EN"
+        # 5. Continuity & Language Resolution
+        resolver = DeterministicContinuityResolver()
+        decision = resolver.resolve(contract)
+        lang = decision.detected_language
+        rag_query = decision.final_rag_query
 
         # 6. Root Prompt
         if lang == "ES":
@@ -276,9 +241,7 @@ class PureCoordinator:
                 pass
 
         # 10. Inject RAG Context
-        rag_query = contract.user_message
         if rag_service and enable_rag:
-            rag_query = StructuralContinuityResolver.resolve_query(contract.user_message, contract.previous_user_message)
             mode = "thinking" if contract.model_id == "reasoning" else ("code" if contract.model_id == "code" else "normal")
             pipeline = "code" if contract.model_id == "code" else "chat"
             try:
@@ -324,7 +287,8 @@ class PureCoordinator:
             memory_observations_count=memory_obs_cnt,
             char_budget=char_budget,
             char_count=char_count,
-            system_prompt_snapshot=system_prompt
+            system_prompt_snapshot=system_prompt,
+            continuity_decision=decision
         )
 
     def build_runtime_context_block(self, state: WorkflowState, active_skill: Optional[str]) -> str:
