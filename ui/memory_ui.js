@@ -367,8 +367,19 @@ class MemoryUI {
 
     // ── Helpers ─────────────────────────────────────────────────
     _sectionHeader(title, badge) {
+        const tooltips = {
+            'Variables': 'Hechos importantes persistentes del proyecto o conversación.',
+            'Tasks': 'Pasos activos del workflow que el runtime utiliza para dar continuidad.',
+            'Observations': 'Señales o insights relevantes detectados durante la interacción.',
+            'Workflow': 'Estado de progreso y fase del workflow actual del coordinador.'
+        };
+        const tooltip = tooltips[title] || '';
         const hdr = document.createElement('div');
         hdr.className = 'memory-section-header';
+        if (tooltip) {
+            hdr.setAttribute('title', tooltip);
+            hdr.style.cursor = 'help';
+        }
         hdr.innerHTML = `
             <span class="memory-section-title">${title}</span>
             <span class="memory-section-badge">${badge}</span>`;

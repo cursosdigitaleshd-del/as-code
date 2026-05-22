@@ -56,7 +56,10 @@ async def chat_completions(
     - Smart routing via model="auto"
     - Explicit model selection
     - Temperature and token control
-    - RAG NotebookLM context injection (X-Enable-RAG / X-Mode / X-Pipeline headers)
+    - RAG NotebookLM context injection into SYSTEM prompt (X-Enable-RAG / X-Mode / X-Pipeline headers)
+    - Skill prompt injection (X-Skill header)
+    - Working Memory injection (X-Session-Id header)
+    - Runtime Coordinator (workflow state, task progression, suggestions)
     """
     engine = request.app.state.engine
     smart_router = request.app.state.router
@@ -70,26 +73,266 @@ async def chat_completions(
     if not user_message:
         raise HTTPException(status_code=400, detail="No user message provided")
 
-    # ── RAG: Inyectar contexto de documentos si hay sesión ──────
-    session_id = request.headers.get("X-Document-Session-Id")
-    if session_id:
-        doc_context = get_document_service().get_context(session_id, max_chars=8000)
+    # Route to optimal model first (needed for mode/pipeline inference)
+    model_param = body.model if body.model != "auto" else None
+    model_id, _ = smart_router.route(user_message, model_param)
+
+    # ── Language Detection & Root Prompt Localization ─────────────
+    # Heuristically detect if user query is Spanish (FIX 1 & 2)
+    spanish_indicators = {"el", "la", "los", "las", "es", "que", "en", "un", "una", "del", "al", "como", "con", "por", "para", "mi", "mis", "de", "no", "cual"}
+    msg_words = set(user_message.lower().split())
+    is_spanish = len(msg_words & spanish_indicators) >= 2 or any(c in user_message for c in ["¿", "á", "é", "í", "ó", "ú", "ñ"])
+    lang = "ES" if is_spanish else "EN"
+
+    if lang == "ES":
+        if model_id == "code":
+            root_prompt = (
+                "Eres un operador de software. Directo, táctico y orientado a resultados. "
+                "Escribe código limpio y eficiente."
+            )
+        else:
+            root_prompt = (
+                "Eres un operador de negocio. Directo, táctico y orientado a resultados.\n"
+                "Analiza y responde brevemente estructurando la respuesta en estas 3 secciones:\n"
+                "- DIAGNÓSTICO: [Fallo principal en una frase]\n"
+                "- ANÁLISIS (Fricción/Valor/Relación): [Fricciones en CTA/proceso, valor/dolor, y confianza/comunicación]\n"
+                "- ACCIÓN: [Recomendación táctica directa]"
+            )
+    else:
+        if model_id == "code":
+            root_prompt = (
+                "You are a software operator. Direct, tactical and results-oriented. "
+                "Write clean, efficient code."
+            )
+        else:
+            root_prompt = (
+                "You are a business operator. Direct, tactical and results-oriented.\n"
+                "Analyze and respond briefly by structuring your response into these 3 sections:\n"
+                "- DIAGNOSIS: [Main failure in one sentence]\n"
+                "- ANALYSIS (Friction/Value/Relation): [Friction in CTA/process, value/pain, and trust/communication]\n"
+                "- ACTION: [Direct tactical recommendation]"
+            )
+
+    # Inject language anchor at POSITION 0
+    system_prompt = f"[LANG={lang}]\n{root_prompt}"
+
+    # ── Session / Skill resolution ──────────────────────────────
+    session_id = request.headers.get("X-Session-Id", "default_session")
+    skill_id = request.headers.get("X-Skill")
+
+    # ── Runtime Coordinator ─────────────────────────────────────
+    # Manages memory limits, task auto-progression, workflow state,
+    # and resolves active skill via priority order:
+    #   manual (X-Skill header) → persistent wf_skill → inferred intent
+    try:
+        from runtime.coordinator.manager import RuntimeCoordinator
+        coordinator = RuntimeCoordinator()
+        decision = coordinator.coordinate(
+            db=db,
+            session_id=session_id,
+            user_message=user_message,
+            manual_skill=skill_id,
+        )
+        resolved_skill = decision.resolved_skill
+        runtime_context = decision.runtime_context
+    except Exception as _coord_err:
+        logger.warning(f"RuntimeCoordinator failed (degrading): {_coord_err}")
+        resolved_skill = skill_id
+        runtime_context = ""
+
+    # ── Skill Runtime: inject skill prompt into SYSTEM ──────────
+    if resolved_skill:
+        skill_service = getattr(request.app.state, "skill_service", None)
+        if skill_service:
+            skill_prompt = skill_service.get_skill_prompt(resolved_skill)
+            if skill_prompt:
+                system_prompt = f"{system_prompt}\n\n{skill_prompt}"
+                logger.info(
+                    f"[SKILL-INJECT] skill={resolved_skill!r} | "
+                    f"prompt_chars={len(skill_prompt)} | "
+                    f"preview={skill_prompt[:60].replace(chr(10), ' ')!r}"
+                )
+
+    # ── Runtime Coordinator context into SYSTEM ─────────────────
+    if runtime_context:
+        # Full localization (Part D)
+        if lang == "ES":
+            runtime_context = runtime_context.replace("Active objective:", "Objetivo activo:")
+            runtime_context = runtime_context.replace("Current phase:", "Fase actual:")
+            runtime_context = runtime_context.replace("Current focus:", "Enfoque actual:")
+            runtime_context = runtime_context.replace("Active skill:", "Habilidad activa:")
+            
+            # Map common English values to Spanish dynamically
+            runtime_context = runtime_context.replace("pipeline", "embudo de ventas")
+            runtime_context = runtime_context.replace("Resolve sales task", "Resolver tarea de ventas")
+            runtime_context = runtime_context.replace("conversion", "conversión")
+
+        system_prompt = f"{system_prompt}\n\n{runtime_context}"
+        logger.info(
+            f"[COORD-INJECT] resolved_skill={resolved_skill!r} | "
+            f"runtime_context_chars={len(runtime_context)}"
+        )
+
+    # ── Working Memory: inject cognitive state into SYSTEM ───────
+    # Injection order: base_prompt → skill_prompt → coordinator_ctx → [Working Memory]
+    memory_chars = 0
+    memory_service = getattr(request.app.state, "memory", None)
+    if memory_service:
+        try:
+            memory_block = memory_service.format_prompt_block(db, session_id)
+            if memory_block:
+                system_prompt = f"{system_prompt}\n\n{memory_block}"
+                memory_chars = len(memory_block)
+                logger.info(
+                    f"[MEM-INJECT] session={session_id!r} | "
+                    f"block_chars={memory_chars}"
+                )
+        except Exception as _mem_err:
+            # Graceful degradation — memory failure never blocks inference
+            logger.warning(f"Working memory inject failed (degrading): {_mem_err}")
+
+    # ── RAG NotebookLM: inject context into SYSTEM prompt ───────
+    # Header: X-Enable-RAG: true/false  (default: true when RAG enabled globally)
+    # Header: X-Mode: normal | thinking | code
+    # Header: X-Pipeline: chat | code
+    #
+    # CRITICAL: RAG context is injected into SYSTEM prompt, NOT user message.
+    rag_chars = 0
+    rag_service = getattr(request.app.state, "rag_service", None)
+    if rag_service and settings.enable_rag_mode:
+        enable_rag = request.headers.get("X-Enable-RAG", "true").lower() != "false"
+        if enable_rag and body.messages:
+            # Resolve mode and pipeline from headers or model routing
+            header_mode = request.headers.get("X-Mode")
+            header_pipeline = request.headers.get("X-Pipeline")
+
+            mode = header_mode if header_mode else (
+                "thinking" if model_id == "reasoning" else (
+                    "code" if model_id == "code" else "normal"
+                )
+            )
+            pipeline = header_pipeline if header_pipeline else (
+                "code" if model_id == "code" else "chat"
+            )
+
+            logger.info(
+                f"[RAG-RETRIEVE] query={user_message!r:.80} | "
+                f"mode={mode} | pipeline={pipeline}"
+            )
+
+            try:
+                context = rag_service.build_context(
+                    query=user_message,
+                    db=db,
+                    mode=mode,
+                    pipeline=pipeline,
+                )
+
+                if context:
+                    rag_chars = len(context)
+                    # ── SYSTEM layer injection ──────────────────────────
+                    system_prompt = f"{system_prompt}\n\n{context}"
+                    logger.info(
+                        f"[RAG-INJECT] mode={mode} | pipeline={pipeline} | "
+                        f"context_chars={rag_chars} | "
+                        f"preview={context[:80].replace(chr(10), ' ')!r}"
+                    )
+                else:
+                    logger.info(
+                        f"[RAG-RETRIEVE-EMPTY] mode={mode} | pipeline={pipeline} | "
+                        f"no chunks found — FAISS may be empty (upload a document first)"
+                    )
+            except Exception as _rag_err:
+                # Graceful degradation — RAG failure never blocks inference
+                logger.warning(f"RAG context failed (degrading gracefully): {_rag_err}")
+
+    # ── Legacy session-based document injection (backward compat) ─
+    # ONLY fires when:
+    #   (a) RAG mode is globally disabled (ASCODE_ENABLE_RAG_MODE=false), AND
+    #   (b) A legacy session ID header is present
+    # Will NOT fire when RAG is enabled.
+    legacy_session_id = request.headers.get("X-Document-Session-Id")
+    if legacy_session_id and not settings.enable_rag_mode:
+        doc_context = get_document_service().get_context(legacy_session_id, max_chars=8000)
         if doc_context and body.messages:
             last = body.messages[-1]
             last.content = f"{doc_context}\n\n---PREGUNTA---\n{last.content}"
+            logger.info(f"[LEGACY-INJECT] session_id={legacy_session_id!r} | chars={len(doc_context)}")
 
-    # Route to optimal model
-    model_param = body.model if body.model != "auto" else None
-    model_id, system_prompt = smart_router.route(user_message, model_param)
+    # ── Localize Structural Headers (FIX 4) ───────────────────────
+    if lang == "ES":
+        # Localize coordinator context header
+        if "## RUNTIME CONTEXT" in system_prompt:
+            system_prompt = system_prompt.replace("## RUNTIME CONTEXT", "## CONTEXTO")
+        # Localize Working Memory header
+        if "## Working Memory" in system_prompt:
+            system_prompt = system_prompt.replace("## Working Memory", "## MEMORIA ACTIVA")
+        # Localize RAG headers
+        if "## CONTEXT FROM DOCUMENTS" in system_prompt:
+            system_prompt = system_prompt.replace("## CONTEXT FROM DOCUMENTS", "## DOCUMENTOS")
+        elif "## RESEARCH CONTEXT" in system_prompt:
+            system_prompt = system_prompt.replace("## RESEARCH CONTEXT", "## DOCUMENTOS")
+
+    # ── Prompt Assembly Debug Log ────────────────────────────────
+    logger.info(
+        f"[PROMPT-ASSEMBLY] model={model_id} | "
+        f"system_prompt_chars={len(system_prompt)} | "
+        f"rag_chars={rag_chars} | "
+        f"memory_chars={memory_chars}"
+    )
+
+    # Semantic parameter presets (Backend Parameter Ownership)
+    PRESETS = {
+        "PRECISE": {"temperature": 0.1, "top_k": 10, "top_p": 0.9, "max_tokens": 2048},
+        "BALANCED": {"temperature": 0.5, "top_k": 40, "top_p": 0.95, "max_tokens": 4096},
+        "CREATIVE": {"temperature": 0.8, "top_k": 50, "top_p": 1.0, "max_tokens": 5120},
+    }
+
+    # Resolve preset automatically based on mode/pipeline/skill
+    inferred_mode = "analytical" # default fallback
+    if model_id == "code" or resolved_skill == "code":
+        inferred_mode = "coding"
+    elif resolved_skill == "sales":
+        inferred_mode = "sales"
+    elif resolved_skill in ("content_creator", "marketing") or model_id == "chat":
+        inferred_mode = "conversational"
+    elif resolved_skill in ("business", "legal") or model_id == "reasoning":
+        inferred_mode = "analytical"
+
+    # Map to semantic presets
+    preset_name = "BALANCED" # default fallback
+    if inferred_mode in ("coding", "extraction"):
+        preset_name = "PRECISE"
+    elif inferred_mode in ("analytical", "sales"):
+        preset_name = "BALANCED"
+    elif inferred_mode == "conversational":
+        preset_name = "CREATIVE"
+
+    # User headers can override preset directly (UI dropdown selection)
+    header_preset = request.headers.get("X-Runtime-Preset")
+    if header_preset in PRESETS:
+        preset_name = header_preset
+
+    preset = PRESETS[preset_name]
+    logger.info(
+        f"[RUNTIME-PRESET] resolved={preset_name} for inferred_mode={inferred_mode} "
+        f"(skill={resolved_skill}, model={model_id})"
+    )
+
+    # Apply preset parameters
+    temp = preset["temperature"]
+    max_tokens = preset["max_tokens"]
+    top_k = preset["top_k"]
+    top_p = preset["top_p"]
 
     # Build the inference request (provider-agnostic)
     inference_request = InferenceRequest(
         prompt=body.build_prompt(),
         model_id=model_id,
-        temperature=body.temperature,
-        max_tokens=body.max_tokens,
-        top_p=body.top_p,
-        top_k=body.top_k,
+        temperature=temp,
+        max_tokens=max_tokens,
+        top_p=top_p,
+        top_k=top_k,
         stop_sequences=body.stop or [],
         stream=body.stream,
         system_prompt=system_prompt,
@@ -177,7 +420,7 @@ async def cancel_generation(request: Request, request_id: str = "", model_id: st
         raise HTTPException(status_code=400, detail="request_id required")
 
     engine = request.app.state.engine
-    # We don't have model_id here usually, but engine.cancel_generation 
+    # We don't have model_id here usually, but engine.cancel_generation
     # will fall back to active_provider if not provided.
     # Pass model_id to engine so it can route to the correct provider
     await engine.cancel_generation(request_id, model_id)

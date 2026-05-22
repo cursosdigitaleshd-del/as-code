@@ -257,11 +257,11 @@ class LiteRTCLIProvider(InferenceProvider):
             env["PYTHONUTF8"] = "1"
             env["PYTHONIOENCODING"] = "utf-8"
 
-            # Merge stderr into stdout to avoid deadlock and capture all info
+            # Discard stderr to prevent startup log contamination
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.DEVNULL,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
@@ -278,6 +278,11 @@ class LiteRTCLIProvider(InferenceProvider):
             # Internal buffer to handle multi-char tags like <think>
             tag_buffer = ""
 
+            # Line-buffered output sanitizer layer (Part 1)
+            skipping_startup_logs = True
+            line_buffer = ""
+            char_queue = []
+
             while True:
                 if cancel_event.is_set():
                     logger.info(f"Cancellation requested for {request.request_id}")
@@ -291,15 +296,63 @@ class LiteRTCLIProvider(InferenceProvider):
                     )
                     return
 
-                # Read one character at a time to ensure real-time streaming
-                # even if no newlines are present (common in DeepSeek <think> blocks)
-                char = proc.stdout.read(1)
+                # Read from queue if not empty, otherwise read from stdout
+                if char_queue:
+                    char = char_queue.pop(0)
+                else:
+                    char = proc.stdout.read(1)
 
                 if not char:
                     # Check if process is still alive
                     if proc.poll() is not None:
+                        # Flush any remaining line buffer at EOF
+                        if skipping_startup_logs and line_buffer:
+                            clean_line = line_buffer.strip()
+                            is_invalid = (
+                                not clean_line
+                                or clean_line.startswith("--")
+                                or "max-num-tokens" in clean_line
+                                or "temperature" in clean_line
+                                or "top-k" in clean_line
+                                or "top-p" in clean_line
+                                or "loading model" in clean_line
+                                or "initializing" in clean_line
+                            )
+                            if not is_invalid:
+                                skipping_startup_logs = False
+                                char_queue.extend(list(line_buffer))
+                                line_buffer = ""
+                                continue
                         break
                     continue
+
+                if skipping_startup_logs:
+                    line_buffer += char
+                    if char == '\n' or len(line_buffer) >= 256:
+                        clean_line = line_buffer.strip()
+                        is_invalid = (
+                            not clean_line
+                            or clean_line.startswith("--")
+                            or "max-num-tokens" in clean_line
+                            or "temperature" in clean_line
+                            or "top-k" in clean_line
+                            or "top-p" in clean_line
+                            or "loading model" in clean_line
+                            or "initializing" in clean_line
+                        )
+                        if is_invalid:
+                            logger.info(f"[LITERT-CLI] Discarding invalid startup line: {clean_line!r}")
+                            line_buffer = ""
+                            continue
+                        else:
+                            # Valid assistant output started! Stop skipping and queue the characters.
+                            logger.info(f"[LITERT-CLI] Valid output detected, stopping skip: {clean_line!r}")
+                            skipping_startup_logs = False
+                            char_queue.extend(list(line_buffer))
+                            line_buffer = ""
+                            char = char_queue.pop(0)
+                    else:
+                        continue
 
                 if first_token_time is None:
                     first_token_time = time.perf_counter()

@@ -13,7 +13,7 @@ AS Code is currently in an active development stage, evolving from a local chat 
 Core architecture and **Phases 1, 2 & 3** are fully completed:
 - **Phase 1 (Core & RAG NotebookLM):** LiteRT-LM Windows inference (GPU accelerated), OpenAI-compatible API, dynamic capability registry, skill prompt injection, and hybrid semantic/keyword retrieval vector pipeline.
 - **Phase 2 (Working Memory Layer):** Runtime-native CRUD memory tables (variables, tasks with priority, observations), session-based isolation (`session_id`), cognitive prompt injection in system prompt, and event-driven UI panel.
-- **Phase 3 (Smart Main Agent Foundation):** Unified Runtime Coordinator managing memory limits, deterministic workflow state transitions (`objective`, `phase`, `focus`), automatic task progression, and skill suggestions with UI badges and chips.
+- **Phase 3 (Smart Main Agent Foundation):** Unified Runtime Coordinator managing memory limits, deterministic workflow state transitions (`objective`, `phase`, `focus`), automatic task progression, and skill suggestions with UI badges and chips. Also includes **Output Stream Stabilization** (stdout line-filtering to remove CLI initialization logs) and **Backend Parameter Presets** (`PRECISE`, `BALANCED`, `CREATIVE`) matching active runtime pipelines.
 
 Current focus (Phase 3.5):
 - **Phase 3.5 (Agent Control Loop):** Server-side agent loops, native execution protocol parsing (`capability.execute()`), and cognitive prompt tuning.

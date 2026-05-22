@@ -42,6 +42,9 @@ Developing the coordinator, deterministic state machines, task auto-progression,
 *   **Workflow State Machine:** Deterministic transition tracker (`wf_objective`, `wf_phase`, `wf_focus`) with automatic task progression based on user intent.
 *   **Skill Recommendation Engine:** Suggestions for switching/activating compatible runtime skills based on intent and phase.
 *   **Unified UI Integration:** Beautiful Workflow Header badge, active Phase pill, Current Focus info, and clickable Suggested Skill chips.
+*   **Output Stabilization Layer:** Line-buffering stdout sanitizer in provider stream to discard initialization logs and raw parameter echoes.
+*   **Backend Parameter Presets:** Semantic config presets (PRECISE, BALANCED, CREATIVE) mapped automatically to active pipelines/skills to prevent parameter drift.
+*   **Working Memory UX Clarifications:** Collapsible settings details layout, preset selector dropdown, operational info card, and section headers hover tooltips.
 
 ---
 

@@ -155,25 +155,43 @@
                 </select>
             </div>
 
-            <!-- Temperature -->
+            <!-- Preset Selector -->
             <div class="setting-group">
-                <label class="setting-label" for="temperatureSlider">
-                    Temperature
-                    <span id="tempValue" class="text-accent-400 ml-1">0.7</span>
-                </label>
-                <input type="range" id="temperatureSlider" min="0" max="2" step="0.1" value="0.7"
-                    class="setting-slider">
-            </div>
-
-            <!-- Max Tokens -->
-            <div class="setting-group">
-                <label class="setting-label" for="maxTokensInput">
-                    Max Tokens
-                </label>
-                <input type="number" id="maxTokensInput" value="5120" min="64" max="8192" step="64"
-                    class="setting-input">
+                <label class="setting-label" for="presetSelect">Runtime Preset</label>
+                <select id="presetSelect" class="setting-select">
+                    <option value="BALANCED">Balanced — Creative logic with structure</option>
+                    <option value="PRECISE">Precise — Low randomness, strict code/extraction</option>
+                    <option value="CREATIVE">Creative — High expressiveness, conversational</option>
+                </select>
             </div>
         </div>
+
+        <!-- Collapsible Advanced Settings -->
+        <details class="mt-4 border-t border-surface-700/50 pt-3 group">
+            <summary class="text-xs font-semibold text-surface-200/50 cursor-pointer hover:text-surface-200 transition select-none flex items-center gap-1">
+                <span class="inline-block transition-transform duration-200 group-open:rotate-90">▶</span> Advanced Runtime Settings
+            </summary>
+            <div class="settings-grid mt-3">
+                <!-- Temperature -->
+                <div class="setting-group">
+                    <label class="setting-label" for="temperatureSlider">
+                        Temperature
+                        <span id="tempValue" class="text-accent-400 ml-1">0.7</span>
+                    </label>
+                    <input type="range" id="temperatureSlider" min="0" max="2" step="0.1" value="0.7"
+                        class="setting-slider">
+                </div>
+
+                <!-- Max Tokens -->
+                <div class="setting-group">
+                    <label class="setting-label" for="maxTokensInput">
+                        Max Tokens
+                    </label>
+                    <input type="number" id="maxTokensInput" value="5120" min="64" max="8192" step="64"
+                        class="setting-input">
+                </div>
+            </div>
+        </details>
     </div>
 
     <!-- ── Skill Suggestion Bar (appears above chat contextually) -->
@@ -361,6 +379,22 @@
                     &times;
                 </button>
             </div>
+
+            <!-- UX Context Info Block (Memoria Operacional) -->
+            <div class="p-3 mx-4 mt-3 rounded-lg bg-surface-800/70 border border-surface-700/60 text-xs flex flex-col gap-1.5 shadow-sm">
+                <div class="flex items-center gap-1.5 font-semibold text-accent-400">
+                    <span>🧠</span>
+                    <span>Memoria Operacional</span>
+                </div>
+                <p class="text-surface-200/75 leading-relaxed">
+                    Este panel permite al runtime mantener el contexto activo, objetivos, tareas y observaciones importantes del workflow para garantizar la continuidad cognitiva.
+                </p>
+                <div class="text-[10px] text-surface-200/35 flex items-center gap-1 italic border-t border-surface-700/40 pt-1.5 mt-0.5">
+                    <span>⚠️</span>
+                    <span>Sistema en evolución — algunas funciones aún en construcción.</span>
+                </div>
+            </div>
+
             <div class="skills-drawer-body" id="memoryContent">
                 <div class="loading-spinner">Loading memory...</div>
             </div>

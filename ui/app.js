@@ -14,6 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messagesContainer: document.getElementById('messagesContainer'),
         welcomeScreen: document.getElementById('welcomeScreen'),
         modelSelect: document.getElementById('modelSelect'),
+        presetSelect: document.getElementById('presetSelect'),
         temperatureSlider: document.getElementById('temperatureSlider'),
         tempValue: document.getElementById('tempValue'),
         maxTokensInput: document.getElementById('maxTokensInput'),
@@ -90,6 +91,24 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.tempValue.textContent = e.target.value;
     });
 
+    elements.presetSelect?.addEventListener('change', (e) => {
+        const presetMap = {
+            PRECISE: { temp: 0.1, tokens: 2048 },
+            BALANCED: { temp: 0.5, tokens: 4096 },
+            CREATIVE: { temp: 0.8, tokens: 5120 }
+        };
+        const config = presetMap[e.target.value];
+        if (config) {
+            if (elements.temperatureSlider) {
+                elements.temperatureSlider.value = config.temp;
+                elements.tempValue.textContent = config.temp;
+            }
+            if (elements.maxTokensInput) {
+                elements.maxTokensInput.value = config.tokens;
+            }
+        }
+    });
+
     // Global Hotkeys
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && state.isGenerating) {
@@ -162,6 +181,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const headers = {
             'Content-Type': 'application/json'
         };
+        if (elements.presetSelect?.value) {
+            headers['X-Runtime-Preset'] = elements.presetSelect.value;
+        }
         // Read active skill from SkillsUI (authoritative state);
         // falls back to hidden #skillSelect for compatibility.
         const activeSkillId = window.skillsUI?.getActiveSkillId()
