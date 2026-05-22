@@ -8,18 +8,15 @@ AS Code is a lightweight, general-purpose local AI runtime designed for speed an
 
 ## Current Status
 
-AS Code is currently in an active development stage, evolving from a local chat server into an extensible **Local AI Operating Layer** (similar to Claude Code, Cursor, or NotebookLM, but run 100% offline via LiteRT on Windows).
+AS Code is currently in an active development stage, evolving from a local chat server into an extensible **Unified Smart Main Agent Runtime** (offline-first, modular, and hardware-optimized alternative to Claude Code, Cursor, or NotebookLM on Windows).
 
-Core architecture and **Phase 1 (NotebookLM RAG)** are fully completed:
-- LiteRT-LM Windows inference (GPU accelerated)
-- OpenAI-compatible chat API (`/v1/chat/completions`) and SSE streaming
-- Minimal UI for browser chat
-- **RAG NotebookLM (RAG v2):** Local embeddings (`bge-small-en-v1.5`), FAISS CPU vector index, SQLite metadata storage, AST-based/heading-based chunking, hybrid semantic + keyword (BM25) retrieval, and structured hierarchical context injection (`NotebookContextBuilder`). Legacy prompt stuffing has been completely eliminated.
+Core architecture and **Phases 1, 2 & 3** are fully completed:
+- **Phase 1 (Core & RAG NotebookLM):** LiteRT-LM Windows inference (GPU accelerated), OpenAI-compatible API, dynamic capability registry, skill prompt injection, and hybrid semantic/keyword retrieval vector pipeline.
+- **Phase 2 (Working Memory Layer):** Runtime-native CRUD memory tables (variables, tasks with priority, observations), session-based isolation (`session_id`), cognitive prompt injection in system prompt, and event-driven UI panel.
+- **Phase 3 (Smart Main Agent Foundation):** Unified Runtime Coordinator managing memory limits, deterministic workflow state transitions (`objective`, `phase`, `focus`), automatic task progression, and skill suggestions with UI badges and chips.
 
-Current focus (Phase 2):
-- Authentication & private data isolation (JWT, private folders/DBs per user)
-- Premium Workspace UI (chat history, multi-conversation auto-save)
-- Extensible Skills System (MCP tools, Claude Code terminal/filesystem compatibility)
+Current focus (Phase 3.5):
+- **Phase 3.5 (Agent Control Loop):** Server-side agent loops, native execution protocol parsing (`capability.execute()`), and cognitive prompt tuning.
 
 ## 🚀 Key Features
 
@@ -28,6 +25,7 @@ Current focus (Phase 2):
 *   **Browser-First UI:** Premium, minimal browser interface with direct document drop zone.
 *   **OpenAI-Compatible API:** Serve as a backend for VS Code extensions (Cline, Continue, etc.).
 *   **RAG NotebookLM (RAG v2):** Multi-stage local pipeline: parses, chunks (AST-aware), generates local embeddings, stores metadata in SQLite + vectors in FAISS, and executes hybrid retrieval.
+*   **Working Memory Layer (Phase 2):** Persistent, session-aware short-term memory (variables, prioritizable tasks, observation provenance tracking) injected dynamically at the SYSTEM level.
 *   **Structured Context Builder:** Composes retrieval context dynamically by grouping chunks under `## CONTEXT FROM DOCUMENTS` by file and section.
 *   **Low-Overhead Hot-Swapping:** Intelligent model loading and idle timeout unloads.
 
@@ -195,10 +193,9 @@ ASCODE_ENABLE_RAG_MODE=true
 | Format | Strategy |
 |---|---|
 | `.py` | AST — by function/class boundaries with symbol metadata |
-| `.md`, `.rst` | By heading hierarchy (`#`, `##`, …) |
+| `.md`, `.rst` | By heading hierarchy (`#`, `##`, …) with adaptive fallback |
 | `.js`, `.ts`, `.go`, etc. | By function/class (regex) |
-| `.pdf` | Semantic paragraph blocks |
-| `.txt`, `.docx` | Fixed-size with overlap |
+| `.pdf`, `.txt`, `.docx` | Structure-agnostic adaptive semantic (paragraph → sentence → char fallback) |
 
 ### Upload a document
 
@@ -253,6 +250,11 @@ Once running, the API is available at `http://localhost:8000`.
 | `/api/rag/context` | POST | Debug: preview NotebookLM context |
 | `/docs` | GET | Interactive API docs (Swagger) |
 | `/v1/capabilities` | GET | Retrieve dynamic runtime capabilities status |
+| `/v1/memory` | GET | Get working memory snapshot (variables, tasks, observations) |
+| `/v1/memory/variables` | POST/DELETE | CRUD variables in working memory |
+| `/v1/memory/tasks` | POST/PATCH/DELETE | CRUD tasks in working memory (status, priority, title) |
+| `/v1/memory/observations` | POST/DELETE | CRUD observations with source provenance |
+| `/v1/memory/reset` | POST | Clear all working memory for the session |
 | `/api/documents/*` | * | *(Deprecated)* Legacy session-based document endpoints |
 
 ## 🧠 Runtime Capabilities
@@ -288,10 +290,11 @@ AS Code exposes an OpenAI-compatible API, making it fully compatible with VSCode
 
 ## 🗺 Roadmap Overview
 
-- **Completed (Phase 1):** LiteRT core runtime, GPU acceleration, OpenAI API, minimal browser UI, and **NotebookLM RAG Pipeline** (hybrid search, local embeddings, FAISS, AST chunking, hierarchy context composition).
-- **In Progress (Phase 2):** **Runtime Capability System** (dynamic capability registry, safety overrides, lazy capability-aware API).
-- **Upcoming (Phase 3 & 4):** Workspace & Persistence (chats, state, multi-tenant isolation), Skill Runtime v1 (manifests, scopes, injection).
-- **Future (Phase 5 to 8):** Skill Builder, Tools & MCP Execution, local marketplace import/export, and Claude/MCP Translation Layer.
+- **Completed (Phase 1):** LiteRT core runtime, GPU acceleration, OpenAI API, minimal browser UI, **NotebookLM RAG Pipeline**, and Dynamic Capability System (registry, safety overrides).
+- **Completed (Phase 2):** **Working Memory Layer** (SQLite persistent tables, session_id isolation, API endpoints, system prompt injection, and event-driven UI drawer).
+- **In Progress (Phase 3):** **Smart Main Agent** (server-side agent loops, XML/JSON capability call parsing, cognitive prompting).
+- **Upcoming (Phase 4 & 5):** Capability Execution (`capability.execute()`), HITL confirmation queues.
+- **Future (Phase 6 to 8):** VSCode/IDE integration, marketplace, and Claude/MCP Translation Layer.
 
 ## 🤝 Contributing
 

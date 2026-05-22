@@ -128,7 +128,17 @@ class MemoryUI {
         const { variables, tasks, observations } = this._data;
 
         this.content.innerHTML = '';
-        this.content.appendChild(this._buildVariablesSection(variables));
+        
+        // Render Workflow panel first
+        const wfSection = this._buildWorkflowSection(variables);
+        if (wfSection) {
+            this.content.appendChild(wfSection);
+        }
+
+        // Filter out wf_* internal workflow variables from the user variables list
+        const userVars = variables.filter(v => !v.key.startsWith('wf_'));
+
+        this.content.appendChild(this._buildVariablesSection(userVars));
         this.content.appendChild(this._buildTasksSection(tasks));
         this.content.appendChild(this._buildObservationsSection(observations));
         this.content.appendChild(this._buildResetSection());
@@ -385,6 +395,97 @@ class MemoryUI {
         return String(str ?? '')
             .replace(/&/g,'&amp;').replace(/</g,'&lt;')
             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Workflow & Suggestions Panel (Phase 2 Coordinator) ──────
+    _buildWorkflowSection(variables) {
+        const vmap = {};
+        variables.forEach(v => { vmap[v.key] = v.value; });
+
+        const objective = vmap['wf_objective'];
+        const phase = vmap['wf_phase'];
+        const focus = vmap['wf_focus'];
+        const suggestionsStr = vmap['wf_suggestions'] || '';
+
+        if (!objective && !phase && !focus && !suggestionsStr) {
+            return null;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'memory-section';
+        wrap.style.cssText = `
+            background: linear-gradient(135deg, rgba(110, 168, 254, 0.08) 0%, rgba(167, 139, 250, 0.08) 100%);
+            border: 1px solid rgba(110, 168, 254, 0.18);
+            border-radius: 8px;
+            padding: 0.85rem;
+            margin-bottom: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.6rem;
+        `;
+
+        // 1. Workflow Objective & Phase Badge
+        const titleText = objective ? `🧠 Workflow: ${this._esc(objective)}` : '🧠 Active Workflow';
+        const phaseBadge = phase ? `<span style="background: rgba(167, 139, 250, 0.2); color: #c084fc; padding: 2px 7px; border-radius: 12px; font-size: 0.65rem; font-weight: 650; text-transform: uppercase; font-family: monospace;">${this._esc(phase)}</span>` : '';
+        
+        const header = document.createElement('div');
+        header.style.cssText = 'display: flex; align-items: center; justify-content: space-between; font-weight: 600; color: #6ea8fe; font-size: 0.8rem;';
+        header.innerHTML = `<span>${titleText}</span> ${phaseBadge}`;
+        wrap.appendChild(header);
+
+        // 2. Current Focus
+        if (focus) {
+            const focusDiv = document.createElement('div');
+            focusDiv.style.cssText = 'font-size: 0.75rem; color: rgba(225, 229, 235, 0.8); line-height: 1.4;';
+            focusDiv.innerHTML = `<span style="color: rgba(225, 229, 235, 0.45); font-weight: 500;">Current Focus:</span> ${this._esc(focus)}`;
+            wrap.appendChild(focusDiv);
+        }
+
+        // 3. Suggested Skills
+        if (suggestionsStr) {
+            const suggestions = suggestionsStr.split(',').filter(Boolean);
+            if (suggestions.length > 0) {
+                const suggDiv = document.createElement('div');
+                suggDiv.style.cssText = 'display: flex; flex-direction: column; gap: 0.3rem; margin-top: 0.2rem;';
+                
+                const skillEmojiMap = {
+                    marketing: '📈 Marketing',
+                    sales: '📞 Sales',
+                    business: '💼 Business',
+                    legal: '⚖️ Legal',
+                    content_creator: '🎬 Content Creator'
+                };
+
+                const chipsHtml = suggestions.map(s => {
+                    const label = skillEmojiMap[s] || `✨ ${s}`;
+                    return `
+                        <button class="skill-sugg-chip" 
+                            style="background: rgba(110, 168, 254, 0.08); border: 1px solid rgba(110, 168, 254, 0.25); color: #9ec5fe; padding: 3px 8px; border-radius: 4px; font-size: 0.7rem; cursor: pointer; transition: all 0.2s;"
+                            onclick="window.memoryUI._activateSuggestedSkill('${this._esc(s)}')">
+                            ${label}
+                        </button>
+                    `;
+                }).join(' ');
+
+                suggDiv.innerHTML = `
+                    <div style="font-size: 0.65rem; color: rgba(225, 229, 235, 0.45); font-weight: 500;">Suggested Skills:</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">${chipsHtml}</div>
+                `;
+                wrap.appendChild(suggDiv);
+            }
+        }
+
+        return wrap;
+    }
+
+    _activateSuggestedSkill(skillId) {
+        if (window.skillsUI) {
+            console.log('[MEMORY-COORDINATOR] Activating suggested skill:', skillId);
+            window.skillsUI.activateSkill(skillId);
+            this.refresh();
+        } else {
+            console.warn('[MEMORY-COORDINATOR] skillsUI module not available');
+        }
     }
 }
 

@@ -1,8 +1,10 @@
 # ROADMAP
 
-AS Code is evolving from a local chat server into a **Local AI Operating Layer** (Offline-first, modular, and extensible alternative to Claude Code, Cursor, and NotebookLM).
+AS Code is evolving from a local chat server into a **Unified Smart Main Agent Runtime** (Offline-first, modular, and extensible alternative to Claude Code, Cursor, and NotebookLM).
 
-## ✅ Phase 1 — Runtime Core & RAG NotebookLM (Completed)
+---
+
+## ✅ Phase 1 — Core Runtime, RAG & Skills (Completed)
 
 *   **LiteRT-LM Windows Runtime:** GPU-accelerated local inference utilizing Gemma 3.
 *   **Smart Routing:** Multi-role orchestration (Chat, Code, Reasoning).
@@ -11,48 +13,80 @@ AS Code is evolving from a local chat server into a **Local AI Operating Layer**
 *   **NotebookLM RAG Pipeline (RAG v2):**
     *   Direct RAG ingest via `/api/rag/documents/upload`.
     *   Local embeddings (`BAAI/bge-small-en-v1.5`) + FAISS index + SQLite metadata.
-    *   AST parsing for Python (.py), heading hierachy for markdown, and paragraph segmenting for PDFs.
+    *   AST parsing for Python (.py), heading hierarchy for markdown, and structure-agnostic adaptive semantic segmenting (paragraph → sentence → char fallback) for PDFs, Word documents, and text.
     *   Hybrid retrieval: `alpha * semantic + (1 - alpha) * keyword (BM25)`.
     *   Structured context composition (`NotebookContextBuilder`) with `normal`, `thinking`, and `code` modes.
-    *   Prompt stuffing and legacy document sessions completely eliminated.
+*   **Runtime Capability Registry:** Dynamic discovery of environment primitives (Git, Terminal, Documents, RAG).
+*   **Skill Runtime v1:** Discoverable JSON manifests and dynamic system prompt injection framework.
 
-## 🚧 Phase 2 — Runtime Capability System (Current Focus)
+---
 
-*   **Dynamic Capability Registry:** A central registry detecting local environment capabilities.
-*   **Safety & Overrides:** User controls (`capability_overrides` dict) to explicitly block features (e.g. terminal execution).
-*   **Hardware & Provider Awareness:** Distinguishing between available, enabled, and health/offline status of each capability.
-*   **Dynamic Capabilities API:** `/v1/capabilities` exposing status, scopes, display names, and categories to the client.
+## ✅ Phase 2 — Working Memory Layer (Completed)
 
-## 🔮 Phase 3 — Workspace & Persistence
+A structured short-term cognitive scratchpad to keep track of agent goals, variables, and observations, fully isolated by session.
 
-*   **Premium Workspace UI:** Sidebars, private chat history browser, and visual document managers.
-*   **Auto-Save & Session Restore:** Permanent persistence of multi-document conversations.
-*   **Shared Memory:** Cross-document search and workspace-level context compilation.
-*   **Secure Multi-Tenant Isolation:** User registration, password hashing (bcrypt), JWT tokens, and private folders/databases per user.
+*   **Session Isolation:** Explicit `session_id` on all memory tables for future-proof multi-chat / VSCode tab isolation.
+*   **Runtime-Native Protocol:** Simple endpoints (`/v1/memory/*`) for CRUD operations on variables, tasks, and observations.
+*   **Task Management:** Priority-aware task list (P0, P1...) allowing the agent to sort objectives.
+*   **Fact Tracking (Observations):** Observation logs categorized by source (`user`, `system`, `rag`, `capability`) for explanation and debugging.
+*   **System Prompt Injection:** Injects formatted memory state directly into the system context in the correct cognitive order: `base_prompt` → `skill_prompt` → `Working Memory` → `RAG Context` (user message) → `History` → `User Message`.
+*   **Event-Driven UI:** Collapsible Memory Drawer showing real-time state, updating only on interactions to save resources.
 
-## 🔮 Phase 4 — Skill Runtime v1
+---
 
-*   **Skill Manifests:** Declaring metadata, capabilities list, and required versioning.
-*   **Prompt Injection Framework:** Dynamic injection of system prompt extensions by active skills.
-*   **Scope Checks:** Skill permission verification against available and enabled capability scopes.
-*   **Activation Lifecycles:** Active, idle, and deactivated states of local skills.
+## ✅ Phase 3 — Smart Main Agent Foundation & Runtime Coordinator (Completed)
 
-## 🔮 Phase 5 — Skill Builder
+Developing the coordinator, deterministic state machines, task auto-progression, and recommended skills engine.
 
-*   **No-Code/Low-Code Creation:** Builder UI to assemble prompts, parameters, and consumed capabilities into custom skills.
-*   **Validation Registry:** Verification of capabilities before a skill can be saved or deployed.
+*   **Runtime Coordinator Manager:** Central orchestrator managing cognitive limits (15 vars, 10 tasks, 20 observations) to prevent token pollution.
+*   **Workflow State Machine:** Deterministic transition tracker (`wf_objective`, `wf_phase`, `wf_focus`) with automatic task progression based on user intent.
+*   **Skill Recommendation Engine:** Suggestions for switching/activating compatible runtime skills based on intent and phase.
+*   **Unified UI Integration:** Beautiful Workflow Header badge, active Phase pill, Current Focus info, and clickable Suggested Skill chips.
 
-## 🔮 Phase 6 — Tools & Execution
+---
 
-*   **System Tools:** Core local capability execution (git status/diff, filesystem read/write, terminal execution).
-*   **Model Context Protocol (MCP):** Integration of external client/server tools.
-*   **Security Sandboxing:** Safe terminal execution boundaries.
+## 🚧 Phase 3.5 — Agent Control Loop & Native Call Parser (Current Focus)
 
-## 🔮 Phase 7 — Marketplace / Import / Export
+Developing the decision-making loop and output syntax parsing to allow the unified model to orchestrate its own actions.
 
-*   **Workspace Export:** Shareable workspace and skill packages (manifests + assets).
-*   **Local Skills Hub:** Offline import/export and registry database for team sharing.
+*   **Native Protocol Parser:** Stream-aware XML or JSON tag listener detecting capability execution requests (e.g. `{"capability": "git", "action": "status", "params": {}}`).
+*   **Server-Side Agent Loop:** Intercepting capability calls, suspending generation, executing the action, and feeding outputs back into the chat loop.
+*   **Cognitive Prompt Tuning:** Formatting base instructions to guide the model on when to write to memory and when to call tools.
 
-## 🔮 Phase 8 — Claude/MCP Translation Layer
+---
 
-*   **Adapter Layer:** API translation layer ensuring that skills/tools designed for Claude Code or MCP operate seamlessly within the AS Code local execution runtime.
+## 🔮 Phase 4 — Capability Execution (using `capability.execute()`)
+
+Activating capabilities by providing execution primitives directly within capability classes.
+
+*   **Base Interface Extension:** Adding an async `execute(action, params)` method to `BaseCapability`.
+*   **Local Terminal Command Runner:** Running shell processes safely, handling outputs, timeouts, and return codes.
+*   **Local Git Interface:** wrapper to fetch diffs, checkout branches, and stage commits.
+*   **Scope Security Boundaries:** Enforcing permission boundaries before letting a skill invoke a capability.
+
+---
+
+## 🔮 Phase 5 — Human-in-the-Loop (HITL) Queue
+
+Adding user confirmation gates for high-impact or destructive operations.
+
+*   **Suspended Execution Queue:** FastAPI state queue keeping pending commands.
+*   **HITL API Endpoints:** Endpoints `/v1/capabilities/pending` and `/v1/capabilities/confirm`.
+*   **Interactive UI Modal:** Consent dialog inside the browser UI to allow the user to modify or approve commands.
+
+---
+
+## 🔮 Phase 6 — IDE / VSCode Integration
+
+Exposing the Unified Agent Runtime to external developer editors.
+
+*   **Workspace Sync API:** Syncing working folders, cursor positions, and open file buffers.
+*   **Cline / Continue Adapters:** Formatting local routes to act as custom providers for standard extensions.
+
+---
+
+## 🔮 Phase 7 — Enterprise, Workspace & Multi-Tenant (Long term)
+
+*   **Sidebar Conversation History:** Navigation list, conversation naming, and database persistence.
+*   **Secure Authentication:** Secure logins, password hashing (bcrypt), JWT tokens, and user database isolation.
+*   **Production Scaling:** PostgreSQL database support and distributed multi-GPU worker pools.

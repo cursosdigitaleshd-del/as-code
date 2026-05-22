@@ -1,13 +1,20 @@
 """
-AS Code — Hybrid Chunker Service
+AS Code — Adaptive Semantic Chunker Service
 
 Routes each file to the correct chunking strategy:
 
-  .py         → AST chunker  (function / class boundaries)
-  .md .rst    → Markdown chunker (heading hierarchy)
+  .py         → AST chunker          (function / class boundaries)
+  .md .rst    → Markdown chunker     (heading hierarchy, fallback to adaptive)
   .js .ts .go → Generic code chunker (regex function boundaries)
-  .pdf        → Semantic paragraph chunker
-  .txt + rest → Fixed-size + overlap
+  .pdf        → Adaptive semantic    (paragraph → sentence → char)
+  .txt .docx  → Adaptive semantic    (paragraph → sentence → char)
+  fallback    → Adaptive semantic    (paragraph → sentence → char)
+
+Key design principle:
+  The adaptive semantic chunker is STRUCTURE-AGNOSTIC.
+  It requires no headings, no fixed formatting, no specific language.
+  It naturally respects paragraph breaks → sentence breaks → character slicing,
+  degrading gracefully on OCR output, messy Word exports, contracts, and notes.
 
 Every chunk carries symbolic metadata (symbol, file, section, line_start, ...)
 ready for future VS Code / Code Graph integration.
@@ -83,10 +90,10 @@ class ChunkerService:
         elif ext in _CODE_EXTENSIONS:
             lang = ext.lstrip(".")
             return self._chunk_code_generic(text, filename, language=lang)
-        elif ext == ".pdf":
-            return self._chunk_pdf_semantic(text, filename)
         else:
-            return self._chunk_fixed(text, filename)
+            # pdf, txt, docx, and all unknown formats → adaptive semantic chunker
+            # Structure-agnostic: respects paragraph → sentence → char boundaries.
+            return self._chunk_adaptive_semantic(text, filename)
 
     # ── Markdown chunker ───────────────────────────────────────
 
@@ -252,45 +259,143 @@ class ChunkerService:
 
         return chunks
 
-    # ── PDF semantic chunker ───────────────────────────────────
+    # ── Adaptive semantic chunker (pdf / txt / docx / fallback) ─
 
-    def _chunk_pdf_semantic(self, text: str, filename: str) -> List[Chunk]:
-        """Group paragraphs (double newline boundaries) into semantic blocks."""
-        paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+    def _chunk_adaptive_semantic(
+        self,
+        text: str,
+        filename: str,
+        section: str = "Document",
+        chunk_type: str = "text",
+        extra_meta: Optional[dict] = None,
+    ) -> List[Chunk]:
+        """
+        Structure-agnostic adaptive chunker.
+
+        Works on OCR output, messy PDFs, plain notes, Word exports, contracts
+        and any document that lacks clean headings or fixed formatting.
+
+        Algorithm (priority order):
+          1. Split text into paragraphs on double newlines (\n\n).
+          2. Coalesce consecutive paragraphs until the character budget is full.
+          3. If a single paragraph exceeds the budget, split it into sentences
+             (on .  ?  !  boundaries) and coalesce sentences instead.
+          4. If a single sentence still exceeds the budget, slice by characters
+             with overlap (last resort — preserves at least some context).
+
+        No headings, no regex structure, no language assumptions required.
+        """
+        max_chars = self._max_chars()
+        overlap_chars = self.chunk_overlap * self._CHARS_PER_TOKEN
 
         chunks: List[Chunk] = []
-        current = ""
         block_idx = 0
 
-        for para in paragraphs:
-            if len(current) + len(para) > self._max_chars():
-                if current.strip():
-                    chunks.append(
-                        Chunk(
-                            text=current.strip(),
-                            section_name=f"Block {block_idx}",
-                            chunk_type="text",
-                            metadata={"file": filename, "block": block_idx},
-                        )
-                    )
-                    block_idx += 1
-                current = para
-            else:
-                current = (current + "\n\n" + para) if current else para
-
-        if current.strip():
+        def _emit(content: str) -> None:
+            nonlocal block_idx
+            content = content.strip()
+            if not content:
+                return
+            label = f"Block {block_idx}" if section == "Document" else f"{section} · {block_idx}"
+            meta: dict = {"file": filename, "block_index": block_idx}
+            if extra_meta:
+                meta.update(extra_meta)
             chunks.append(
                 Chunk(
-                    text=current.strip(),
-                    section_name=f"Block {block_idx}",
-                    chunk_type="text",
-                    metadata={"file": filename, "block": block_idx},
+                    text=content,
+                    section_name=label,
+                    chunk_type=chunk_type,
+                    metadata=meta,
                 )
             )
+            block_idx += 1
+
+        def _coalesce_into_chunks(units: List[str], separator: str) -> None:
+            """
+            Greedily coalesce units (paragraphs or sentences) into chunks.
+            Each chunk is as large as possible without exceeding max_chars.
+            """
+            current_parts: List[str] = []
+            current_len = 0
+
+            for unit in units:
+                unit_len = len(unit)
+                sep_len = len(separator) if current_parts else 0
+
+                if current_len + sep_len + unit_len <= max_chars:
+                    current_parts.append(unit)
+                    current_len += sep_len + unit_len
+                else:
+                    if current_parts:
+                        _emit(separator.join(current_parts))
+                    # Unit itself exceeds budget — must slice by character
+                    if unit_len > max_chars:
+                        _slice_by_chars(unit)
+                        current_parts = []
+                        current_len = 0
+                    else:
+                        current_parts = [unit]
+                        current_len = unit_len
+
+            if current_parts:
+                _emit(separator.join(current_parts))
+
+        def _slice_by_chars(text_block: str) -> None:
+            """Last-resort: slice long text by raw characters with overlap."""
+            i = 0
+            while i < len(text_block):
+                slice_text = text_block[i : i + max_chars].strip()
+                if slice_text:
+                    _emit(slice_text)
+                i += max_chars - overlap_chars
+
+        # ── Step 1: paragraph split ───────────────────────────
+        paragraphs = [p.strip() for p in re.split(r"\n{2,}", text) if p.strip()]
+        if not paragraphs:
+            return []
+
+        # ── Step 2 & 3: coalesce paragraphs; fall to sentences if needed ──
+        current_para_parts: List[str] = []
+        current_para_len = 0
+
+        for para in paragraphs:
+            para_len = len(para)
+            sep_len = 2 if current_para_parts else 0  # "\n\n"
+
+            if current_para_len + sep_len + para_len <= max_chars:
+                # Fits: accumulate
+                current_para_parts.append(para)
+                current_para_len += sep_len + para_len
+            else:
+                # Emit what we have
+                if current_para_parts:
+                    _emit("\n\n".join(current_para_parts))
+                    current_para_parts = []
+                    current_para_len = 0
+
+                if para_len <= max_chars:
+                    # Single paragraph fits a fresh chunk — start a new block
+                    current_para_parts = [para]
+                    current_para_len = para_len
+                else:
+                    # Paragraph is too large — split into sentences
+                    sentences = [
+                        s.strip()
+                        for s in re.split(r"(?<=[.!?])\s+", para)
+                        if s.strip()
+                    ]
+                    if len(sentences) > 1:
+                        _coalesce_into_chunks(sentences, " ")
+                    else:
+                        # No sentence boundary found — slice by character
+                        _slice_by_chars(para)
+
+        if current_para_parts:
+            _emit("\n\n".join(current_para_parts))
 
         return chunks or self._chunk_fixed(text, filename)
 
-    # ── Fixed-size chunker (fallback) ──────────────────────────
+    # ── Fixed-size character slicer (internal leaf fallback) ───
 
     def _chunk_fixed(
         self,
@@ -300,7 +405,16 @@ class ChunkerService:
         chunk_type: str = "text",
         extra_meta: Optional[dict] = None,
     ) -> List[Chunk]:
-        """Fixed-size with overlap. Used as fallback for all strategies."""
+        """
+        Pure character-based slicer with overlap.
+
+        This is an internal leaf used only by:
+          - _chunk_markdown (when a heading's body block overflows)
+          - _chunk_adaptive_semantic (as last-resort for sentences with no punctuation)
+
+        It is NOT a public routing target — all external file types are handled
+        by the adaptive semantic chunker or the code/AST chunkers.
+        """
         char_size = self._max_chars()
         char_overlap = self.chunk_overlap * self._CHARS_PER_TOKEN
 
