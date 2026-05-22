@@ -45,6 +45,12 @@ Developing the coordinator, deterministic state machines, task auto-progression,
 *   **Output Stabilization Layer:** Line-buffering stdout sanitizer in provider stream to discard initialization logs and raw parameter echoes.
 *   **Backend Parameter Presets:** Semantic config presets (PRECISE, BALANCED, CREATIVE) mapped automatically to active pipelines/skills to prevent parameter drift.
 *   **Working Memory UX Clarifications:** Collapsible settings details layout, preset selector dropdown, operational info card, and section headers hover tooltips.
+*   **Runtime Hardening (Fase 1):**
+    *   **RuntimeContract**: Immutable model representing request state and session history.
+    *   **ContextManifest**: Serializable intermediate snapshot of prompts, budgets, and RAG details.
+    *   **PureCoordinator**: Stateless prompt assembly engine ensuring zero database writes during the prompt compilation phase.
+    *   **RuntimeStateMutator**: Post-inference atomic database mutator separating context rendering from side effects.
+    *   **Conversational Continuity (Continuity Fix)**: Deterministic, language-independent `StructuralContinuityResolver` resolving follow-up queries by merging context based on word-count and technical symbol density.
 
 ---
 

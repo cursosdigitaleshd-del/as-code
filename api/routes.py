@@ -120,137 +120,64 @@ async def chat_completions(
     session_id = request.headers.get("X-Session-Id", "default_session")
     skill_id = request.headers.get("X-Skill")
 
-    # ── Runtime Coordinator ─────────────────────────────────────
-    # Manages memory limits, task auto-progression, workflow state,
-    # and resolves active skill via priority order:
-    #   manual (X-Skill header) → persistent wf_skill → inferred intent
-    try:
-        from runtime.coordinator.manager import RuntimeCoordinator
-        coordinator = RuntimeCoordinator()
-        decision = coordinator.coordinate(
-            db=db,
-            session_id=session_id,
-            user_message=user_message,
-            manual_skill=skill_id,
-        )
-        resolved_skill = decision.resolved_skill
-        runtime_context = decision.runtime_context
-    except Exception as _coord_err:
-        logger.warning(f"RuntimeCoordinator failed (degrading): {_coord_err}")
-        resolved_skill = skill_id
-        runtime_context = ""
-
-    # ── Skill Runtime: inject skill prompt into SYSTEM ──────────
-    if resolved_skill:
-        skill_service = getattr(request.app.state, "skill_service", None)
-        if skill_service:
-            skill_prompt = skill_service.get_skill_prompt(resolved_skill)
-            if skill_prompt:
-                system_prompt = f"{system_prompt}\n\n{skill_prompt}"
-                logger.info(
-                    f"[SKILL-INJECT] skill={resolved_skill!r} | "
-                    f"prompt_chars={len(skill_prompt)} | "
-                    f"preview={skill_prompt[:60].replace(chr(10), ' ')!r}"
-                )
-
-    # ── Runtime Coordinator context into SYSTEM ─────────────────
-    if runtime_context:
-        # Full localization (Part D)
-        if lang == "ES":
-            runtime_context = runtime_context.replace("Active objective:", "Objetivo activo:")
-            runtime_context = runtime_context.replace("Current phase:", "Fase actual:")
-            runtime_context = runtime_context.replace("Current focus:", "Enfoque actual:")
-            runtime_context = runtime_context.replace("Active skill:", "Habilidad activa:")
+    # ── Runtime Contract (Subfase 1A / Continuity) ──────────────
+    import time
+    from runtime.coordinator.models import RuntimeContract
+    
+    # Resolve previous user message from multi-turn history
+    previous_user_message = None
+    if len(body.messages) >= 3:
+        user_msgs = [msg.content for msg in body.messages if msg.role == "user"]
+        if len(user_msgs) >= 2:
+            # The last element is user_message, so the second to last is user_msgs[-2]
+            previous_user_message = user_msgs[-2]
             
-            # Map common English values to Spanish dynamically
-            runtime_context = runtime_context.replace("pipeline", "embudo de ventas")
-            runtime_context = runtime_context.replace("Resolve sales task", "Resolver tarea de ventas")
-            runtime_context = runtime_context.replace("conversion", "conversión")
+    contract = RuntimeContract(
+        request_id=request_id,
+        session_id=session_id,
+        model_id=model_id,
+        user_message=user_message,
+        previous_user_message=previous_user_message,
+        manual_skill=skill_id,
+        timestamp=time.time()
+    )
+    logger.info(f"[HARDENING-CONTRACT] Created RuntimeContract: id={contract.request_id} session={contract.session_id} has_prev={previous_user_message is not None}")
 
-        system_prompt = f"{system_prompt}\n\n{runtime_context}"
-        logger.info(
-            f"[COORD-INJECT] resolved_skill={resolved_skill!r} | "
-            f"runtime_context_chars={len(runtime_context)}"
+    # ── Pure Context Assembly (Subfase 1C/1D) ──────────────────────
+    try:
+        from runtime.coordinator.manager import PureCoordinator
+        pure_coord = PureCoordinator()
+        
+        skill_service = getattr(request.app.state, "skill_service", None)
+        rag_service = getattr(request.app.state, "rag_service", None)
+        memory_service = getattr(request.app.state, "memory", None)
+        
+        manifest = pure_coord.assemble(
+            db=db,
+            contract=contract,
+            skill_service=skill_service,
+            rag_service=rag_service,
+            memory_service=memory_service,
+            enable_rag=settings.enable_rag_mode
         )
-
-    # ── Working Memory: inject cognitive state into SYSTEM ───────
-    # Injection order: base_prompt → skill_prompt → coordinator_ctx → [Working Memory]
-    memory_chars = 0
-    memory_service = getattr(request.app.state, "memory", None)
-    if memory_service:
-        try:
-            memory_block = memory_service.format_prompt_block(db, session_id)
-            if memory_block:
-                system_prompt = f"{system_prompt}\n\n{memory_block}"
-                memory_chars = len(memory_block)
-                logger.info(
-                    f"[MEM-INJECT] session={session_id!r} | "
-                    f"block_chars={memory_chars}"
-                )
-        except Exception as _mem_err:
-            # Graceful degradation — memory failure never blocks inference
-            logger.warning(f"Working memory inject failed (degrading): {_mem_err}")
-
-    # ── RAG NotebookLM: inject context into SYSTEM prompt ───────
-    # Header: X-Enable-RAG: true/false  (default: true when RAG enabled globally)
-    # Header: X-Mode: normal | thinking | code
-    # Header: X-Pipeline: chat | code
-    #
-    # CRITICAL: RAG context is injected into SYSTEM prompt, NOT user message.
-    rag_chars = 0
-    rag_service = getattr(request.app.state, "rag_service", None)
-    if rag_service and settings.enable_rag_mode:
-        enable_rag = request.headers.get("X-Enable-RAG", "true").lower() != "false"
-        if enable_rag and body.messages:
-            # Resolve mode and pipeline from headers or model routing
-            header_mode = request.headers.get("X-Mode")
-            header_pipeline = request.headers.get("X-Pipeline")
-
-            mode = header_mode if header_mode else (
-                "thinking" if model_id == "reasoning" else (
-                    "code" if model_id == "code" else "normal"
-                )
-            )
-            pipeline = header_pipeline if header_pipeline else (
-                "code" if model_id == "code" else "chat"
-            )
-
-            logger.info(
-                f"[RAG-RETRIEVE] query={user_message!r:.80} | "
-                f"mode={mode} | pipeline={pipeline}"
-            )
-
-            try:
-                context = rag_service.build_context(
-                    query=user_message,
-                    db=db,
-                    mode=mode,
-                    pipeline=pipeline,
-                )
-
-                if context:
-                    rag_chars = len(context)
-                    # ── SYSTEM layer injection ──────────────────────────
-                    system_prompt = f"{system_prompt}\n\n{context}"
-                    logger.info(
-                        f"[RAG-INJECT] mode={mode} | pipeline={pipeline} | "
-                        f"context_chars={rag_chars} | "
-                        f"preview={context[:80].replace(chr(10), ' ')!r}"
-                    )
-                else:
-                    logger.info(
-                        f"[RAG-RETRIEVE-EMPTY] mode={mode} | pipeline={pipeline} | "
-                        f"no chunks found — FAISS may be empty (upload a document first)"
-                    )
-            except Exception as _rag_err:
-                # Graceful degradation — RAG failure never blocks inference
-                logger.warning(f"RAG context failed (degrading gracefully): {_rag_err}")
+        system_prompt = manifest.system_prompt_snapshot
+        resolved_skill = manifest.active_skill
+        logger.info(f"[HARDENING-MANIFEST] PureCoordinator compiled: {manifest.model_dump_json(exclude={'system_prompt_snapshot'})}")
+    except Exception as assemble_err:
+        logger.error(f"PureCoordinator.assemble failed (degrading): {assemble_err}", exc_info=True)
+        # Fallback to a basic prompt if it fails completely
+        system_prompt = f"[LANG={lang}]\n{root_prompt}"
+        resolved_skill = skill_id
+        from runtime.coordinator.models import WorkflowState, ContextManifest
+        manifest = ContextManifest(
+            contract_id=contract.request_id,
+            active_skill=resolved_skill,
+            workflow_state=WorkflowState(),
+            rag_enabled=False,
+            system_prompt_snapshot=system_prompt
+        )
 
     # ── Legacy session-based document injection (backward compat) ─
-    # ONLY fires when:
-    #   (a) RAG mode is globally disabled (ASCODE_ENABLE_RAG_MODE=false), AND
-    #   (b) A legacy session ID header is present
-    # Will NOT fire when RAG is enabled.
     legacy_session_id = request.headers.get("X-Document-Session-Id")
     if legacy_session_id and not settings.enable_rag_mode:
         doc_context = get_document_service().get_context(legacy_session_id, max_chars=8000)
@@ -259,26 +186,12 @@ async def chat_completions(
             last.content = f"{doc_context}\n\n---PREGUNTA---\n{last.content}"
             logger.info(f"[LEGACY-INJECT] session_id={legacy_session_id!r} | chars={len(doc_context)}")
 
-    # ── Localize Structural Headers (FIX 4) ───────────────────────
-    if lang == "ES":
-        # Localize coordinator context header
-        if "## RUNTIME CONTEXT" in system_prompt:
-            system_prompt = system_prompt.replace("## RUNTIME CONTEXT", "## CONTEXTO")
-        # Localize Working Memory header
-        if "## Working Memory" in system_prompt:
-            system_prompt = system_prompt.replace("## Working Memory", "## MEMORIA ACTIVA")
-        # Localize RAG headers
-        if "## CONTEXT FROM DOCUMENTS" in system_prompt:
-            system_prompt = system_prompt.replace("## CONTEXT FROM DOCUMENTS", "## DOCUMENTOS")
-        elif "## RESEARCH CONTEXT" in system_prompt:
-            system_prompt = system_prompt.replace("## RESEARCH CONTEXT", "## DOCUMENTOS")
-
     # ── Prompt Assembly Debug Log ────────────────────────────────
     logger.info(
         f"[PROMPT-ASSEMBLY] model={model_id} | "
         f"system_prompt_chars={len(system_prompt)} | "
-        f"rag_chars={rag_chars} | "
-        f"memory_chars={memory_chars}"
+        f"rag_enabled={manifest.rag_enabled if manifest else False} | "
+        f"memory_vars={manifest.memory_variables_count if manifest else 0}"
     )
 
     # Semantic parameter presets (Backend Parameter Ownership)
@@ -343,6 +256,14 @@ async def chat_completions(
         # Streaming response (SSE)
         result_stream = engine.generate_stream(inference_request)
 
+        # Apply state mutations post-inference dispatch (Subfase 1D)
+        if manifest:
+            try:
+                from runtime.coordinator.mutator import RuntimeStateMutator
+                RuntimeStateMutator.apply_state_mutations(db, contract, manifest)
+            except Exception as mut_err:
+                logger.warning(f"Failed to apply state mutations in streaming flow: {mut_err}")
+
         return StreamingResponse(
             stream_inference_results(result_stream, model_id, request_id),
             media_type="text/event-stream",
@@ -358,6 +279,14 @@ async def chat_completions(
         start = time.perf_counter()
         result = await engine.generate(inference_request)
         elapsed_ms = (time.perf_counter() - start) * 1000
+
+        # Apply state mutations post-inference dispatch (Subfase 1D)
+        if manifest:
+            try:
+                from runtime.coordinator.mutator import RuntimeStateMutator
+                RuntimeStateMutator.apply_state_mutations(db, contract, manifest)
+            except Exception as mut_err:
+                logger.warning(f"Failed to apply state mutations in non-streaming flow: {mut_err}")
 
         return ChatCompletionResponse(
             id=f"chatcmpl-{uuid.uuid4().hex[:12]}",

@@ -40,16 +40,22 @@ def save_workflow_state(db: Session, session_id: str, state: WorkflowState) -> N
     if state.active_skill is not None:
         mem_mgr.set_variable(db, session_id, "wf_skill", state.active_skill)
 
-def update_workflow(
-    db: Session,
-    session_id: str,
+def predict_next_workflow_state(
     user_message: str,
-    inferred_skill: Optional[str]
+    inferred_skill: Optional[str],
+    current_state: WorkflowState
 ) -> WorkflowState:
     """
-    Update workflow phase, focus, and objective based on message intent and active skill.
+    Pure function to predict workflow phase, focus, and objective
+    based on user message, inferred skill, and current state.
+    NO database writes.
     """
-    state = load_workflow_state(db, session_id)
+    state = WorkflowState(
+        objective=current_state.objective,
+        current_phase=current_state.current_phase,
+        current_focus=current_state.current_focus,
+        active_skill=current_state.active_skill
+    )
     msg_lower = user_message.lower()
 
     # 1. Initialize or swap workflow if a new skill/intent is detected and no active skill exists,
@@ -125,6 +131,19 @@ def update_workflow(
             state.current_phase = "publishing"
             state.current_focus = "Publishing content"
 
+    return state
+
+def update_workflow(
+    db: Session,
+    session_id: str,
+    user_message: str,
+    inferred_skill: Optional[str]
+) -> WorkflowState:
+    """
+    Update workflow phase, focus, and objective based on message intent and active skill.
+    """
+    current_state = load_workflow_state(db, session_id)
+    state = predict_next_workflow_state(user_message, inferred_skill, current_state)
     # Save transitions
     save_workflow_state(db, session_id, state)
     return state
